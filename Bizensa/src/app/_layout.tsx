@@ -3,9 +3,14 @@ import "@/global.css";
 import { useFonts } from "expo-font";
 import { useEffect } from "react";
 
+import { useCurrency } from "@/constants/currency";
+
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  // Must stay above the early `return null` below (hooks can't be called conditionally)
+  const { code } = useCurrency();
+
   const [fontsLoaded] = useFonts({
     "sans-bold": require("../../assets/fonts/poppins.bold.ttf"),
     "sans-extrabold": require("../../assets/fonts/poppins.extrabold.ttf"),
@@ -25,7 +30,10 @@ export default function RootLayout() {
   }
 
   return (
+      // `key={code}`: when the currency changes, the whole navigation tree is
+      // rebuilt, so every screen reloads and shows the new currency.
       <Stack
+          key={code}
           screenOptions={{
             headerShown: false,
           }}

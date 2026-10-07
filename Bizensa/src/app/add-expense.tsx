@@ -24,6 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { Colors } from "@/constants/theme";
 import { API_URL } from "@/constants/api";
+import { useCurrency } from "@/constants/currency";
 
 /* ---------- Theme ---------- */
 const T = Colors.dark;
@@ -97,6 +98,7 @@ const SelectModal = ({
 export default function AddExpense() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { symbol } = useCurrency();
 
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
@@ -204,7 +206,7 @@ export default function AddExpense() {
           >
             <Field label="Expense Amount">
               <View style={styles.input}>
-                <Text style={styles.prefix}>Rs</Text>
+                <Text style={styles.prefix}>{symbol}</Text>
                 <TextInput
                     style={styles.inputText}
                     value={amount}

@@ -21,9 +21,9 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons";
 
 import { Colors } from "@/constants/theme";
-import { formatMoney } from "@/constants/transactions";
 import { InvoiceItem, TAX_RATE, formatShortDateObj } from "@/constants/invoices";
-import { API_URL, useCustomers } from "@/constants/api";
+import { API_URL, formatMoney, useCustomers } from "@/constants/api";
+import { useCurrency } from "@/constants/currency";
 
 const T = Colors.dark;
 const C = {
@@ -48,6 +48,7 @@ export default function CreateInvoice() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { customers } = useCustomers();
+  const { symbol } = useCurrency();
 
   const [customer, setCustomer] = useState("");
   const [items, setItems] = useState<InvoiceItem[]>([]);
@@ -300,7 +301,7 @@ export default function CreateInvoice() {
                       style={[styles.formInput, { flex: 2 }]}
                       value={itemPrice}
                       onChangeText={setItemPrice}
-                      placeholder="Price per unit (Rs)"
+                      placeholder={`Price per unit (${symbol})`}
                       placeholderTextColor={C.muted}
                       keyboardType="numeric"
                   />

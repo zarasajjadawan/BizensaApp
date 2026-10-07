@@ -20,10 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Field, FC, ScreenHeader, SelectModal, formStyles as s } from "@/components/form-parts";
 import { formatShortDateObj } from "@/constants/invoices";
 import { API_URL, useCustomers } from "@/constants/api";
-// import { CUSTOMERS, formatShortDateObj } from "@/constants/invoices";
-// import {API_URL} from "@/constants/api";
-
-
+import { useCurrency } from "@/constants/currency";
 
 const CATEGORIES = ["Sales", "Services", "Investment", "Interest", "Other"];
 const PAYMENT_METHODS = ["Cash", "Bank Account", "Credit Card", "Mobile Wallet"];
@@ -33,6 +30,8 @@ export default function AddIncome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { customers } = useCustomers();
+  const { symbol } = useCurrency();
+
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [customer, setCustomer] = useState(NO_CUSTOMER);
@@ -112,7 +111,7 @@ export default function AddIncome() {
           >
             <Field label="Income Amount">
               <View style={s.input}>
-                <Text style={s.prefix}>Rs</Text>
+                <Text style={s.prefix}>{symbol}</Text>
                 <TextInput
                     style={s.inputText}
                     value={amount}

@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import {
   View,
@@ -8,12 +8,19 @@ import {
   StyleSheet,
   StatusBar,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { Colors } from "@/constants/theme";
-import { buildTransactions, formatLongDate, formatMoney, useAppData } from "@/constants/api";
+import {
+  buildTransactions,
+  deleteTransaction,
+  formatLongDate,
+  formatMoney,
+  useAppData,
+} from "@/constants/api";
 
 const T = Colors.dark;
 const C = {
@@ -37,23 +44,38 @@ export default function TransactionDetails() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data, loading } = useAppData();
+
+  const { data, loading, refresh } = useAppData();
+
+  const [deleting, setDeleting] = useState(false);
+
   const tx = useMemo(
       () => buildTransactions(data).find((t) => t.id === id),
       [data, id]
   );
 
+  const confirmDelete = async () => {
+    if (!tx || deleting) return;
+
+    setDeleting(true);
+    try {
+      await deleteTransaction(tx.id);
+
+      // Reload the dashboard / lists so the deleted item disappears everywhere
+      await refresh();
+
+      router.back();
+    } catch (err: any) {
+      Alert.alert("Error", err?.message || "Could not delete transaction");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const onDelete = () => {
     Alert.alert("Delete transaction?", "This can't be undone.", [
       { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          // TODO: call DELETE /api/transaction/:id here
-          router.back();
-        },
-      },
+      { text: "Delete", style: "destructive", onPress: confirmDelete },
     ]);
   };
 
@@ -67,7 +89,12 @@ export default function TransactionDetails() {
         <StatusBar barStyle="light-content" backgroundColor={C.bg} />
 
         <View style={styles.topBar}>
-          <TouchableOpacity style={styles.topLeft} onPress={() => router.back()} hitSlop={12}>
+          <TouchableOpacity
+              style={styles.topLeft}
+              onPress={() => router.back()}
+              hitSlop={12}
+              disabled={deleting}
+          >
             <Ionicons name="chevron-back" size={26} color={C.text} />
           </TouchableOpacity>
           <Text style={styles.title}>Transaction Details</Text>
@@ -114,12 +141,29 @@ export default function TransactionDetails() {
                 <Detail label="Description" value={tx.description || "-"} />
               </ScrollView>
 
-              <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-                <TouchableOpacity style={[styles.btn, styles.editBtn]} activeOpacity={0.8} onPress={onEdit}>
+              <View
+                  style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 16) }]}
+              >
+                <TouchableOpacity
+                    style={[styles.btn, styles.editBtn, deleting && styles.btnDisabled]}
+                    activeOpacity={0.8}
+                    onPress={onEdit}
+                    disabled={deleting}
+                >
                   <Text style={styles.editText}>Edit</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.btn, styles.deleteBtn]} activeOpacity={0.8} onPress={onDelete}>
-                  <Text style={styles.deleteText}>Delete</Text>
+
+                <TouchableOpacity
+                    style={[styles.btn, styles.deleteBtn, deleting && styles.btnDisabled]}
+                    activeOpacity={0.8}
+                    onPress={onDelete}
+                    disabled={deleting}
+                >
+                  {deleting ? (
+                      <ActivityIndicator color={C.red} />
+                  ) : (
+                      <Text style={styles.deleteText}>Delete</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </>
@@ -154,27 +198,6 @@ const styles = StyleSheet.create({
   detailLabel: { color: C.text, fontSize: 15, fontWeight: "600" },
   detailValue: { color: C.muted, fontSize: 15, marginTop: 6 },
 
-  receipt: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginTop: 10,
-    padding: 10,
-    borderRadius: 12,
-    backgroundColor: C.card,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  thumb: {
-    width: 36,
-    height: 40,
-    borderRadius: 6,
-    backgroundColor: "#1c1c22",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  receiptName: { flex: 1, color: C.text, fontSize: 15 },
-
   actions: { flexDirection: "row", gap: 14, paddingHorizontal: 20, paddingTop: 12 },
   btn: {
     flex: 1,
@@ -184,6 +207,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
+  btnDisabled: { opacity: 0.5 },
   editBtn: { backgroundColor: C.card, borderColor: C.border },
   editText: { color: C.text, fontSize: 16, fontWeight: "600" },
   deleteBtn: { backgroundColor: "#1c0a0c", borderColor: C.red },

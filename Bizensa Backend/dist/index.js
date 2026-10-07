@@ -14,6 +14,7 @@ const income_routes_1 = __importDefault(require("./routes/income.routes"));
 const customer_routes_1 = __importDefault(require("./routes/customer.routes"));
 const invoice_routes_1 = __importDefault(require("./routes/invoice.routes"));
 const data_routes_1 = __importDefault(require("./routes/data.routes"));
+const transaction_routes_1 = __importDefault(require("./routes/transaction.routes"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3000;
@@ -40,6 +41,7 @@ app.use("/api/customers", customer_routes_1.default);
 app.use("/api/invoices", invoice_routes_1.default);
 app.use("/uploads", express_1.default.static(path_1.default.join(process.cwd(), "uploads")));
 app.use("/api/data", data_routes_1.default);
+app.use("/api/transactions", transaction_routes_1.default);
 // 404 handler (always JSON)
 app.use((req, res) => {
     console.log("404 NOT FOUND:", req.method, req.originalUrl);

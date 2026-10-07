@@ -1,6 +1,8 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import * as SecureStore from "expo-secure-store";
 import { useFocusEffect, useRouter } from "expo-router";
+
+import { getCurrency, useCurrency } from "@/constants/currency";
 
 export const API_URL = "https://sanctuary-unlikable-uncertain.ngrok-free.dev";
 
@@ -32,26 +34,28 @@ export async function authFetch(path: string, init: RequestInit = {}) {
   });
 }
 
-/** Loads the logged-in user from GET /api/auth/me */
+/** Loads the logged-in user from GET /api/auth/me (reloads every time the screen is focused) */
 export function useCurrentUser() {
   const [user, setUser] = useState<ApiUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await authFetch("/api/auth/me");
-        if (res && res.ok) {
-          const json = await res.json();
-          if (json.success) setUser(json.data.user);
-        }
-      } catch (err) {
-        console.log("Load user error:", err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  useFocusEffect(
+      useCallback(() => {
+        (async () => {
+          try {
+            const res = await authFetch("/api/auth/me");
+            if (res && res.ok) {
+              const json = await res.json();
+              if (json.success) setUser(json.data.user);
+            }
+          } catch (err) {
+            console.log("Load user error:", err);
+          } finally {
+            setLoading(false);
+          }
+        })();
+      }, [])
+  );
 
   return { user, loading };
 }
@@ -176,6 +180,10 @@ export const EMPTY_DATA: AppData = {
  */
 export function useAppData() {
   const router = useRouter();
+
+  // Re-render every screen that shows money when the currency changes
+  useCurrency();
+
   const [data, setData] = useState<AppData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -223,8 +231,12 @@ export function useAppData() {
    Formatting + mapping helpers (used by several screens)
    ===================================================================== */
 
-export const formatMoney = (n: number) =>
-    `Rs ${Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+/** "Rs 1,000" or "$1,000" depending on the currency chosen in Settings > Currency */
+export const formatMoney = (n: number) => {
+  const { symbol, spaced } = getCurrency();
+  const num = Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  return `${symbol}${spaced ? " " : ""}${num}`;
+};
 
 /** 1000 -> "1k", 2500 -> "2.5k", 750 -> "750" (chart axis labels) */
 export const formatCompact = (n: number) => {
@@ -365,3 +377,20 @@ export const STATUS_COLOR: Record<InvoiceStatus, string> = {
   pending: "#f59e0b",
   overdue: "#ef4444",
 };
+
+/** DELETE /api/transactions/:id */
+export async function deleteTransaction(id: string): Promise<void> {
+  const res = await authFetch(`/api/transactions/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!res) {
+    throw new Error("You are not logged in");
+  }
+
+  const json = await res.json();
+
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Could not delete transaction");
+  }
+}

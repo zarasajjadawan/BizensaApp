@@ -1,4 +1,5 @@
 import type { Ionicons } from "@expo/vector-icons";
+import {getCurrency} from "@/constants/currency";
 
 export type TransactionType = "income" | "expense";
 type IconName = React.ComponentProps<typeof Ionicons>["name"];

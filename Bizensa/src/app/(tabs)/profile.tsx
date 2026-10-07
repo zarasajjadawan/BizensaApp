@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import * as SecureStore from "expo-secure-store";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons";
 
 import { Colors, components } from "@/constants/theme";
+import { API_URL } from "@/constants/api";
 
 const T = Colors.dark;
 const C = {
@@ -26,8 +27,6 @@ const C = {
   muted: T.textSecondary,
   red: T.danger,
 };
-
-
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -42,7 +41,6 @@ interface MenuItem {
   key: string;
   label: string;
   icon: IconName;
-  // TODO: set `route` to the screen each item should open, e.g. "/personal-information"
   route?: string;
 }
 
@@ -101,9 +99,13 @@ export default function Profile() {
     }
   }, [router]);
 
-  useEffect(() => {
-    fetchUser();
-  }, [fetchUser]);
+  // Reload every time this tab is focused, so edits (name, business name...)
+  // show up right away after saving on another screen.
+  useFocusEffect(
+      useCallback(() => {
+        fetchUser();
+      }, [fetchUser])
+  );
 
   const logout = () => {
     Alert.alert("Log out?", "You will need to sign in again.", [
@@ -148,20 +150,14 @@ export default function Profile() {
             </View>
           </View>
 
-          {/* Business */}
-          <TouchableOpacity
-              style={styles.businessCard}
-              activeOpacity={0.7}
-              onPress={() => router.push("/business-details")}
-          >
+          <View style={styles.businessCard}>
             <View>
               <Text style={styles.businessLabel}>Business</Text>
               <Text style={styles.businessName}>
                 {loading ? "Loading..." : user?.businessName ?? "-"}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={C.text} />
-          </TouchableOpacity>
+          </View>
 
           {/* Menu */}
           <View style={styles.menu}>

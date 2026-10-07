@@ -9,6 +9,7 @@ import incomeRoutes from "./routes/income.routes";
 import customerRoutes from "./routes/customer.routes";
 import invoiceRoutes from "./routes/invoice.routes";
 import dataRoutes from "./routes/data.routes";
+import transactionRoutes from "./routes/transaction.routes";
 
 dotenv.config();
 
@@ -42,6 +43,7 @@ app.use("/api/customers", customerRoutes);
 app.use("/api/invoices", invoiceRoutes);
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/api/data", dataRoutes);
+app.use("/api/transactions", transactionRoutes);
 
 // 404 handler (always JSON)
 app.use((req: Request, res: Response) => {

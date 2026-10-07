@@ -16,6 +16,7 @@ export default function BusinessDetails() {
   const [taxNumber, setTaxNumber] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Fill the fields with the saved values once the user is loaded
   useEffect(() => {
     if (user) {
       setBusinessName(user.businessName ?? "");
@@ -31,10 +32,12 @@ export default function BusinessDetails() {
       Alert.alert("Enter a business name", "Business name is required.");
       return;
     }
+
     try {
       setSaving(true);
-      // TODO: change this endpoint / body to match your backend
-      const res = await authFetch("/api/business", {
+
+      // Saves the business fields on the logged-in user (PUT /api/auth/me)
+      const res = await authFetch("/api/auth/me", {
         method: "PUT",
         body: JSON.stringify({
           businessName: businessName.trim(),
@@ -44,15 +47,20 @@ export default function BusinessDetails() {
           taxNumber: taxNumber.trim(),
         }),
       });
+
       if (!res) {
         router.replace("/(auth)/sign-in");
         return;
       }
+
       const json = await res.json();
+
       if (!res.ok || json.success === false) {
         Alert.alert("Couldn't save changes", json.message ?? "Please try again.");
         return;
       }
+
+      // useCurrentUser reloads on focus, so the new values show up when we go back
       router.back();
     } catch (err) {
       console.log("Save business error:", err);
@@ -63,45 +71,45 @@ export default function BusinessDetails() {
   };
 
   return (
-    <ScreenShell title="Business Details">
-      <TextField
-        label="Business Name"
-        value={businessName}
-        onChangeText={setBusinessName}
-        placeholder="e.g. Zara Technologies"
-        autoCapitalize="words"
-      />
-      <TextField
-        label="Business Type (optional)"
-        value={businessType}
-        onChangeText={setBusinessType}
-        placeholder="e.g. Software, Retail"
-        autoCapitalize="words"
-      />
-      <TextField
-        label="Business Phone"
-        value={phone}
-        onChangeText={setPhone}
-        placeholder="e.g. 042 1234567"
-        keyboardType="phone-pad"
-      />
-      <TextField
-        label="Address"
-        value={address}
-        onChangeText={setAddress}
-        placeholder="Street, city"
-        multiline
-        textAlignVertical="top"
-        style={{ minHeight: 90, paddingTop: 14 }}
-      />
-      <TextField
-        label="NTN / Tax Number (optional)"
-        value={taxNumber}
-        onChangeText={setTaxNumber}
-        placeholder="e.g. 1234567-8"
-        autoCapitalize="characters"
-      />
-      <SaveButton label="Save Changes" loading={saving} onPress={save} />
-    </ScreenShell>
+      <ScreenShell title="Business Details">
+        <TextField
+            label="Business Name"
+            value={businessName}
+            onChangeText={setBusinessName}
+            placeholder="e.g. Zara Technologies"
+            autoCapitalize="words"
+        />
+        <TextField
+            label="Business Type (optional)"
+            value={businessType}
+            onChangeText={setBusinessType}
+            placeholder="e.g. Software, Retail"
+            autoCapitalize="words"
+        />
+        <TextField
+            label="Business Phone"
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="e.g. 042 1234567"
+            keyboardType="phone-pad"
+        />
+        <TextField
+            label="Address"
+            value={address}
+            onChangeText={setAddress}
+            placeholder="Street, city"
+            multiline
+            textAlignVertical="top"
+            style={{ minHeight: 90, paddingTop: 14 }}
+        />
+        <TextField
+            label="NTN / Tax Number (optional)"
+            value={taxNumber}
+            onChangeText={setTaxNumber}
+            placeholder="e.g. 1234567-8"
+            autoCapitalize="characters"
+        />
+        <SaveButton label="Save Changes" loading={saving} onPress={save} />
+      </ScreenShell>
   );
 }

@@ -57,6 +57,15 @@ const userSchema = new mongoose_1.Schema({
         required: [true, "Business name is required"],
         trim: true,
     },
+    businessType: { type: String, trim: true, default: "" },
+    businessPhone: { type: String, trim: true, default: "" },
+    businessAddress: { type: String, trim: true, default: "" },
+    taxNumber: { type: String, trim: true, default: "" },
+    // Forgot-password (never returned unless explicitly selected)
+    resetCodeHash: { type: String, select: false },
+    resetCodeExpires: { type: Date, select: false },
+    resetAttempts: { type: Number, default: 0, select: false },
+    resetRequestedAt: { type: Date, select: false },
 }, {
     timestamps: true,
 });
