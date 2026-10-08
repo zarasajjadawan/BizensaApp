@@ -42,6 +42,7 @@ const incomeSchema = new mongoose_1.Schema({
     date: { type: Date, required: true },
     paymentMethod: { type: String, required: true },
     description: { type: String, trim: true, default: "" },
+    receiptUrl: { type: String, default: null },
 }, { timestamps: true });
 exports.default = mongoose_1.default.model("Income", incomeSchema);
 //# sourceMappingURL=income.model.js.map

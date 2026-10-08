@@ -428,6 +428,19 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
             "+resetCodeHash +resetCodeExpires +resetAttempts"
         );
 
+        // ---- TEMP DEBUG LOG (testing ke baad hata dein) ----
+        console.log("[RESET]", {
+            found: !!user,
+            hasHash: !!user?.resetCodeHash,
+            expires: user?.resetCodeExpires,
+            now: new Date(),
+            attempts: user?.resetAttempts,
+            hashMatches: user?.resetCodeHash
+                ? safeEqual(hashCode(email, code), user.resetCodeHash)
+                : null,
+        });
+        // ----------------------------------------------------
+
         const invalid = () =>
             res.status(400).json({
                 success: false,

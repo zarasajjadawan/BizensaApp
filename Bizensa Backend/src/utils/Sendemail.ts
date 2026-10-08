@@ -1,14 +1,5 @@
 import nodemailer from "nodemailer";
 
-/**
- * Sends the 6-digit password reset code.
- *
- * Needs these values in your backend .env:
- *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM (optional)
- *
- * While SMTP is not configured (and NODE_ENV is not "production") the code is
- * printed in the backend terminal instead, so you can test without email.
- */
 export const sendResetCodeEmail = async (
     to: string,
     name: string,
@@ -20,6 +11,10 @@ export const sendResetCodeEmail = async (
         if (process.env.NODE_ENV === "production") {
             throw new Error("Email service is not configured");
         }
+        console.log(
+            "[MAIL] SMTP env vars missing (check .env is loaded). " +
+            `SMTP_HOST=${!!SMTP_HOST} SMTP_USER=${!!SMTP_USER} SMTP_PASS=${!!SMTP_PASS}`
+        );
         console.log(`[DEV] Password reset code for ${to}: ${code}`);
         return;
     }
@@ -33,20 +28,40 @@ export const sendResetCodeEmail = async (
         auth: { user: SMTP_USER, pass: SMTP_PASS },
     });
 
-    await transporter.sendMail({
-        from: MAIL_FROM || SMTP_USER,
-        to,
-        subject: "Your password reset code",
-        text:
-            `Hi ${name},\n\n` +
-            `Your password reset code is: ${code}\n\n` +
-            `It expires in 15 minutes. If you didn't ask for this, you can ignore this email.`,
-        html:
-            `<div style="font-family:Arial,sans-serif;max-width:420px">` +
-            `<p>Hi ${name},</p>` +
-            `<p>Your password reset code is:</p>` +
-            `<p style="font-size:32px;font-weight:700;letter-spacing:6px">${code}</p>` +
-            `<p>It expires in 15 minutes. If you didn't ask for this, you can ignore this email.</p>` +
-            `</div>`,
-    });
+    // Login/connection check: clear error throwega (e.g. 535 Invalid login, ETIMEDOUT)
+    try {
+        await transporter.verify();
+        console.log("[MAIL] SMTP connection verified");
+    } catch (err) {
+        console.error("[MAIL] SMTP verify FAILED:", err);
+        throw err;
+    }
+
+    try {
+        const info = await transporter.sendMail({
+            from: MAIL_FROM || SMTP_USER,
+            to,
+            subject: "Your password reset code",
+            text:
+                `Hi ${name},\n\n` +
+                `Your password reset code is: ${code}\n\n` +
+                `It expires in 15 minutes. If you didn't ask for this, you can ignore this email.`,
+            html:
+                `<div style="font-family:Arial,sans-serif;max-width:420px">` +
+                `<p>Hi ${name},</p>` +
+                `<p>Your password reset code is:</p>` +
+                `<p style="font-size:32px;font-weight:700;letter-spacing:6px">${code}</p>` +
+                `<p>It expires in 15 minutes. If you didn't ask for this, you can ignore this email.</p>` +
+                `</div>`,
+        });
+
+        console.log(
+            "[MAIL] Sent:", info.messageId,
+            "| accepted:", info.accepted,
+            "| rejected:", info.rejected
+        );
+    } catch (err) {
+        console.error("[MAIL] sendMail FAILED:", err);
+        throw err;
+    }
 };

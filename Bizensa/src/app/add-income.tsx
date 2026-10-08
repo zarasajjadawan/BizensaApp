@@ -12,16 +12,19 @@ import {
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Image,
+  StyleSheet,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { Field, ScreenHeader, SelectModal, formStyles as s } from "@/components/form-parts";
-import { C, useAppTheme } from "@/constants/theme";
+import { C, themedStyles, useAppTheme } from "@/constants/theme";
 import ThemedStatusBar from "@/components/themed-status-bar";
 import { formatShortDateObj } from "@/constants/invoices";
 import { API_URL, buildTransactions, useAppData, useCustomers } from "@/constants/api";
 import { useCurrency } from "@/constants/currency";
+import { pickReceiptImage, sendForm } from "@/constants/upload";
 
 const CATEGORIES = ["Sales", "Services", "Investment", "Interest", "Other"];
 const PAYMENT_METHODS = ["Cash", "Bank Account", "Credit Card", "Mobile Wallet"];
@@ -54,6 +57,9 @@ export default function AddIncome() {
   const [date, setDate] = useState(new Date());
   const [payment, setPayment] = useState(PAYMENT_METHODS[1]);
   const [description, setDescription] = useState("");
+  // Either a saved receipt URL (edit mode) or a newly picked local file
+  const [receipt, setReceipt] = useState<string | null>(null);
+  const [receiptChanged, setReceiptChanged] = useState(false);
 
   const [catOpen, setCatOpen] = useState(false);
   const [custOpen, setCustOpen] = useState(false);
@@ -72,7 +78,16 @@ export default function AddIncome() {
     setDate(existing.date ? new Date(existing.date) : new Date());
     setPayment(existing.paymentMethod || PAYMENT_METHODS[1]);
     setDescription(existing.description ?? "");
+    setReceipt(existing.receiptUrl ? existing.receiptUrl : null);
   }, [existing]);
+
+  const pickReceipt = async () => {
+    const uri = await pickReceiptImage();
+    if (uri) {
+      setReceipt(uri);
+      setReceiptChanged(true);
+    }
+  };
 
   const save = async () => {
     const value = Number(amount.replace(/[^0-9.]/g, ""));
@@ -89,26 +104,45 @@ export default function AddIncome() {
         return;
       }
 
-      const res = await fetch(
+      const form = new FormData();
+      form.append("amount", String(value));
+      form.append("category", category);
+      form.append("date", date.toISOString());
+      form.append("paymentMethod", payment);
+      form.append("description", description);
+      if (customer !== NO_CUSTOMER) {
+        form.append("customer", customer);
+      } else if (isEdit) {
+        form.append("customer", ""); // clears the customer on edit
+      }
+      // Upload only a newly picked image (not the already saved URL)
+      if (receipt && receiptChanged) {
+        form.append("receipt", {
+          uri: receipt,
+          name: `receipt-${Date.now()}.jpg`,
+          type: "image/jpeg",
+        } as any);
+      }
+      // User removed the saved receipt without picking a new one
+      if (isEdit && receiptChanged && !receipt) {
+        form.append("removeReceipt", "true");
+      }
+
+      const res = await sendForm(
           isEdit ? `${API_URL}/api/transactions/${id}` : `${API_URL}/api/income`,
-          {
-            method: isEdit ? "PUT" : "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-              "ngrok-skip-browser-warning": "true",
-            },
-            body: JSON.stringify({
-              amount: value,
-              category,
-              customer: customer === NO_CUSTOMER ? null : customer,
-              date: date.toISOString(),
-              paymentMethod: payment,
-              description,
-            }),
-          }
+          isEdit ? "PUT" : "POST",
+          token,
+          form
       );
-      const json = await res.json();
+
+      let json: any = {};
+      try {
+        json = JSON.parse(res.text);
+      } catch {
+        console.log("Non-JSON response:", res.status, res.text.slice(0, 200));
+        Alert.alert("Server error", `Unexpected response (${res.status}). Check the server log.`);
+        return;
+      }
 
       if (res.ok && json.success === true) {
         Alert.alert(
@@ -125,7 +159,7 @@ export default function AddIncome() {
       console.log("Save income error:", err);
       Alert.alert(
           isEdit ? "Couldn't update income" : "Couldn't save income",
-          "Check your connection and try again."
+          `Check your connection and try again.\n\n(${(err as any)?.message ?? "unknown error"})`
       );
     } finally {
       setSaving(false);
@@ -230,6 +264,34 @@ export default function AddIncome() {
               />
             </Field>
 
+            <Field label="Receipt">
+              {receipt ? (
+                  <View style={styles.receiptBox}>
+                    <Image
+                        source={{
+                          uri: receipt.startsWith("/") ? `${API_URL}${receipt}` : receipt,
+                          headers: { "ngrok-skip-browser-warning": "true" },
+                        }}
+                        style={styles.receiptImg}
+                    />
+                    <TouchableOpacity
+                        style={styles.removeReceipt}
+                        onPress={() => {
+                          setReceipt(null);
+                          setReceiptChanged(true);
+                        }}
+                    >
+                      <Ionicons name="close" size={16} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+              ) : (
+                  <TouchableOpacity style={[s.input, styles.center]} activeOpacity={0.7} onPress={pickReceipt}>
+                    <Ionicons name="add" size={20} color={C.purpleSoft} />
+                    <Text style={styles.addReceipt}>Add Receipt</Text>
+                  </TouchableOpacity>
+              )}
+            </Field>
+
             <TouchableOpacity
                 style={[s.saveBtn, saving && { opacity: 0.7 }]}
                 activeOpacity={0.85}
@@ -272,3 +334,23 @@ export default function AddIncome() {
       </SafeAreaView>
   );
 }
+
+const styles = themedStyles((C) =>
+    StyleSheet.create({
+      center: { justifyContent: "center", gap: 6 },
+      addReceipt: { color: C.purpleSoft, fontSize: 15, fontWeight: "600" },
+      receiptBox: { borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: C.border },
+      receiptImg: { width: "100%", height: 160 },
+      removeReceipt: {
+        position: "absolute",
+        top: 8,
+        right: 8,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: "rgba(0,0,0,0.6)",
+        alignItems: "center",
+        justifyContent: "center",
+      },
+    })
+);

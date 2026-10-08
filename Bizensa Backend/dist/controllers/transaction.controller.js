@@ -102,7 +102,7 @@ const getTransactionOptions = (_req, res) => {
 exports.getTransactionOptions = getTransactionOptions;
 // PUT /api/transactions/:id
 // Edits an expense or an income (whichever the id belongs to).
-// Expense: JSON or multipart (optional new receipt, or removeReceipt=true).
+// Both: JSON or multipart (optional new receipt, or removeReceipt=true).
 const updateTransaction = async (req, res) => {
     const file = req.file;
     try {
@@ -176,32 +176,41 @@ const updateTransaction = async (req, res) => {
             });
             return;
         }
-        await removeUploaded(file); // income has no receipt
-        const updated = await income_model_1.default.findOneAndUpdate({ _id: rawId, user: userId }, {
-            $set: {
-                amount: value.amount,
-                category: value.category,
-                date: value.date,
-                paymentMethod: value.paymentMethod,
-                description: value.description ?? "",
-                customer: value.customer || null,
-            },
-        }, { new: true, runValidators: true });
+        const set = {
+            amount: value.amount,
+            category: value.category,
+            date: value.date,
+            paymentMethod: value.paymentMethod,
+            description: value.description ?? "",
+            customer: value.customer || null,
+        };
+        const oldReceipt = income.receiptUrl;
+        if (file) {
+            set.receiptUrl = `/uploads/${file.filename}`;
+        }
+        else if (String(body.removeReceipt) === "true") {
+            set.receiptUrl = null;
+        }
+        const updated = await income_model_1.default.findOneAndUpdate({ _id: rawId, user: userId }, { $set: set }, { new: true, runValidators: true });
+        // Delete the old file only after the DB update succeeded
+        if (set.receiptUrl !== undefined && oldReceipt && oldReceipt !== set.receiptUrl) {
+            await removeReceipt(oldReceipt);
+        }
         res.status(200).json({
             success: true,
             message: "Transaction updated",
             data: { transaction: updated, type: "income" },
         });
     }
-    catch (err) {
-        await removeUploaded(file);
-        console.error("Update Transaction Error:", err);
+    catch (err) { // <-- restored
+        await removeUploaded(file); // <-- restored
+        console.error("Update Transaction Error:", err); // <-- restored
         res.status(500).json({
-            success: false,
-            message: err?.message || "Something went wrong. Please try again later.",
-        });
-    }
-};
+            success: false, // <-- restored
+            message: err?.message || "Something went wrong. Please try again later.", // <-- restored
+        }); // <-- restored
+    } // <-- restored
+}; // <-- restored
 exports.updateTransaction = updateTransaction;
 // DELETE /api/transactions/:id
 const deleteTransaction = async (req, res) => {
@@ -230,6 +239,7 @@ const deleteTransaction = async (req, res) => {
         // 2) Try income
         const income = await income_model_1.default.findOneAndDelete({ _id: rawId, user: userId });
         if (income) {
+            await removeReceipt(income.receiptUrl);
             res.status(200).json({
                 success: true,
                 message: "Transaction deleted",

@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { C, themedStyles } from "@/constants/theme";
 import ThemedStatusBar from "@/components/themed-status-bar";
 import {
+  API_URL,
   buildTransactions,
   deleteTransaction,
   formatLongDate,
@@ -29,6 +31,13 @@ const Detail = ({ label, value }: { label: string; value: string }) => (
     </View>
 );
 
+// "/uploads/abc.jpg" -> "https://your-server/uploads/abc.jpg"
+const receiptSource = (url: string) => ({
+  uri: /^https?:\/\//i.test(url) ? url : `${API_URL}${url}`,
+  // ngrok free URLs show a warning page instead of the image without this header
+  headers: { "ngrok-skip-browser-warning": "true" },
+});
+
 export default function TransactionDetails() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -36,6 +45,8 @@ export default function TransactionDetails() {
 
   const { data, loading, refresh } = useAppData();
   const [deleting, setDeleting] = useState(false);
+  const [imgLoading, setImgLoading] = useState(true);
+  const [imgFailed, setImgFailed] = useState(false);
 
   const tx = useMemo(
       () => buildTransactions(data).find((t) => t.id === id),
@@ -71,6 +82,8 @@ export default function TransactionDetails() {
       params: { id: tx.id },
     });
   };
+
+  const hasReceipt = !!tx && !!tx.receiptUrl;
 
   return (
       <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -125,6 +138,34 @@ export default function TransactionDetails() {
                     <Detail label="Customer" value={tx.customer} />
                 ) : null}
                 <Detail label="Description" value={tx.description || "-"} />
+
+                {hasReceipt && (
+                    <View style={styles.detail}>
+                      <Text style={styles.detailLabel}>Receipt</Text>
+                      <View style={styles.receiptBox}>
+                        {imgFailed ? (
+                            <View style={styles.receiptFallback}>
+                              <Ionicons name="image-outline" size={28} color={C.muted} />
+                              <Text style={styles.receiptFallbackText}>Couldn't load receipt</Text>
+                            </View>
+                        ) : (
+                            <Image
+                                source={receiptSource(tx.receiptUrl as string)}
+                                style={styles.receiptImg}
+                                resizeMode="contain"
+                                onLoadEnd={() => setImgLoading(false)}
+                                onError={() => {
+                                  setImgLoading(false);
+                                  setImgFailed(true);
+                                }}
+                            />
+                        )}
+                        {imgLoading && !imgFailed && (
+                            <ActivityIndicator style={styles.receiptLoader} color={C.purple} />
+                        )}
+                      </View>
+                    </View>
+                )}
               </ScrollView>
 
               <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 16) }]}>
@@ -181,6 +222,21 @@ const styles = themedStyles((C) => StyleSheet.create({
   detail: { marginBottom: 20 },
   detailLabel: { color: C.text, fontSize: 15, fontWeight: "600" },
   detailValue: { color: C.muted, fontSize: 15, marginTop: 6 },
+
+  receiptBox: {
+    marginTop: 10,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.card,
+    minHeight: 120,
+    justifyContent: "center",
+  },
+  receiptImg: { width: "100%", height: 320 },
+  receiptLoader: { position: "absolute", alignSelf: "center" },
+  receiptFallback: { alignItems: "center", justifyContent: "center", paddingVertical: 32, gap: 8 },
+  receiptFallbackText: { color: C.muted, fontSize: 14 },
 
   actions: { flexDirection: "row", gap: 14, paddingHorizontal: 20, paddingTop: 12 },
   btn: {

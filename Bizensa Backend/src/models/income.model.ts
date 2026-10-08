@@ -8,6 +8,7 @@ export interface IIncome {
     date: Date;
     paymentMethod: string;
     description?: string;
+    receiptUrl?: string | null;
 }
 
 const incomeSchema = new Schema<IIncome>(
@@ -19,6 +20,7 @@ const incomeSchema = new Schema<IIncome>(
         date: { type: Date, required: true },
         paymentMethod: { type: String, required: true },
         description: { type: String, trim: true, default: "" },
+        receiptUrl: { type: String, default: null },
     },
     { timestamps: true }
 );

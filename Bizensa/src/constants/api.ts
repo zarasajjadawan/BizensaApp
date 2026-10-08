@@ -107,6 +107,7 @@ export interface ApiExpense {
   date: string;
   paymentMethod: string;
   description: string;
+  receiptUrl?: string | null; // <-- added
   createdAt: string;
 }
 
@@ -119,6 +120,7 @@ export interface ApiIncome {
   paymentMethod: string;
   description: string;
   createdAt: string;
+  receiptUrl?: string | null;
 }
 
 export interface ApiInvoiceItem {
@@ -300,6 +302,7 @@ export interface Transaction {
   paymentMethod: string;
   description: string;
   customer?: string | null;
+  receiptUrl?: string | null; // <-- added
 }
 
 export const buildTransactions = (data: AppData): Transaction[] => [
@@ -314,6 +317,7 @@ export const buildTransactions = (data: AppData): Transaction[] => [
     paymentMethod: i.paymentMethod,
     description: i.description,
     customer: i.customer,
+    receiptUrl: i.receiptUrl ?? null,
   })),
   ...data.expenses.map<Transaction>((e) => ({
     id: e._id,
@@ -325,6 +329,7 @@ export const buildTransactions = (data: AppData): Transaction[] => [
     date: e.date,
     paymentMethod: e.paymentMethod,
     description: e.description,
+    receiptUrl: e.receiptUrl ?? null, // <-- added
   })),
 ];
 
