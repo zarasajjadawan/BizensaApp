@@ -4,12 +4,14 @@ import { useFonts } from "expo-font";
 import { useEffect } from "react";
 
 import { useCurrency } from "@/constants/currency";
+import { C, useAppTheme } from "@/constants/theme";
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  // Must stay above the early `return null` below (hooks can't be called conditionally)
+  // Hooks must stay above the early `return null` below
   const { code } = useCurrency();
+  const { scheme, ready } = useAppTheme();
 
   const [fontsLoaded] = useFonts({
     "sans-bold": require("../../assets/fonts/poppins.bold.ttf"),
@@ -20,22 +22,24 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded) {
+    if (fontsLoaded && ready) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, ready]);
 
-  if (!fontsLoaded) {
+  // Wait for fonts AND the saved theme, so there is no dark flash for light users
+  if (!fontsLoaded || !ready) {
     return null;
   }
 
   return (
-      // `key={code}`: when the currency changes, the whole navigation tree is
-      // rebuilt, so every screen reloads and shows the new currency.
+      // `key`: when the currency or the theme changes, the whole navigation tree
+      // is rebuilt, so every screen reloads with the new currency / colors.
       <Stack
-          key={code}
+          key={`${code}-${scheme}`}
           screenOptions={{
             headerShown: false,
+            contentStyle: { backgroundColor: C.bg },
           }}
       />
   );

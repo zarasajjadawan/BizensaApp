@@ -6,7 +6,6 @@ import {
     ScrollView,
     TouchableOpacity,
     StyleSheet,
-    StatusBar,
     LayoutChangeEvent,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,7 +20,8 @@ import Svg, {
 } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 
-import { Colors, components } from "@/constants/theme";
+import { C, components, themedStyles } from "@/constants/theme";
+import ThemedStatusBar from "@/components/themed-status-bar";
 import {
     ApiUser,
     AppData,
@@ -42,20 +42,6 @@ interface QuickAction {
 }
 
 /* ---------- Theme ---------- */
-const T = Colors.dark;
-
-const C = {
-    bg: T.background,
-    card: T.surface,
-    border: T.border,
-    purple: T.primary,
-    purpleSoft: T.primarySoft,
-    purpleDark: T.primaryDark,
-    text: T.text,
-    muted: T.textSecondary,
-    green: T.success,
-    red: T.danger,
-};
 
 const getGreeting = () => {
     const h = new Date().getHours();
@@ -412,7 +398,7 @@ export default function Index() {
 
     return (
         <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+            <ThemedStatusBar />
 
             <ScrollView
                 contentContainerStyle={[styles.scroll, { paddingBottom: bottomSpace }]}
@@ -441,7 +427,7 @@ export default function Index() {
                         if (key === "expense") router.push("/add-expense");
                         else if (key === "income") router.push("/add-income");
                         else if (key === "invoice") router.push("/invoices");
-                        else if (key === "customer") router.push("/add-customer");
+                        else if (key === "customer") router.push("/customers");
                     }}
                 />
 
@@ -453,7 +439,7 @@ export default function Index() {
 
 /* ---------- Styles ---------- */
 
-const styles = StyleSheet.create({
+const styles = themedStyles((C) => StyleSheet.create({
     safe: {
         flex: 1,
         backgroundColor: C.bg,
@@ -511,12 +497,12 @@ const styles = StyleSheet.create({
     },
 
     balanceLabel: {
-        color: "#D9B8FF",
+        color: C.onPurpleMuted,
         fontSize: 13,
     },
 
     balanceValue: {
-        color: C.text,
+        color: C.onPurple,
         fontSize: 32,
         fontWeight: "700",
         marginTop: 8,
@@ -535,7 +521,7 @@ const styles = StyleSheet.create({
     },
 
     balanceChangeSuffix: {
-        color: "#D9B8FF",
+        color: C.onPurpleMuted,
         fontSize: 12,
         marginLeft: 2,
     },
@@ -618,9 +604,9 @@ const styles = StyleSheet.create({
         width: 58,
         height: 58,
         borderRadius: 16,
-        backgroundColor: "#1c1030",
+        backgroundColor: C.chipBg,
         borderWidth: 1,
-        borderColor: "#4a2390",
+        borderColor: C.chipBorder,
         alignItems: "center",
         justifyContent: "center",
     },
@@ -651,4 +637,4 @@ const styles = StyleSheet.create({
         padding: 14,
         marginTop: 14,
     },
-});
+}));

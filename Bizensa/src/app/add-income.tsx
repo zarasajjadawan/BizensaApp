@@ -1,14 +1,13 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import {
   View,
   Text,
   TextInput,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
   Platform,
   Alert,
   ActivityIndicator,
@@ -17,20 +16,37 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
-import { Field, FC, ScreenHeader, SelectModal, formStyles as s } from "@/components/form-parts";
+import { Field, ScreenHeader, SelectModal, formStyles as s } from "@/components/form-parts";
+import { C, useAppTheme } from "@/constants/theme";
+import ThemedStatusBar from "@/components/themed-status-bar";
 import { formatShortDateObj } from "@/constants/invoices";
-import { API_URL, useCustomers } from "@/constants/api";
+import { API_URL, buildTransactions, useAppData, useCustomers } from "@/constants/api";
 import { useCurrency } from "@/constants/currency";
 
 const CATEGORIES = ["Sales", "Services", "Investment", "Interest", "Other"];
 const PAYMENT_METHODS = ["Cash", "Bank Account", "Credit Card", "Mobile Wallet"];
 const NO_CUSTOMER = "No customer";
 
+/**
+ * Add income  -> open without params
+ * Edit income -> open with params { id: "<transaction id>" }
+ */
 export default function AddIncome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { customers } = useCustomers();
   const { symbol } = useCurrency();
+  const { isDark } = useAppTheme();
+
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const isEdit = !!id;
+
+  // Only needed to find the transaction when editing
+  const { data, loading } = useAppData();
+  const existing = useMemo(
+      () => (isEdit ? buildTransactions(data).find((t) => t.id === id) : undefined),
+      [isEdit, data, id]
+  );
 
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
@@ -44,6 +60,19 @@ export default function AddIncome() {
   const [payOpen, setPayOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Edit mode: fill the form once with the saved income
+  const filled = useRef(false);
+  useEffect(() => {
+    if (!existing || filled.current) return;
+    filled.current = true;
+    setAmount(String(existing.amount ?? ""));
+    setCategory(existing.category || CATEGORIES[0]);
+    setCustomer(existing.customer ? existing.customer : NO_CUSTOMER);
+    setDate(existing.date ? new Date(existing.date) : new Date());
+    setPayment(existing.paymentMethod || PAYMENT_METHODS[1]);
+    setDescription(existing.description ?? "");
+  }, [existing]);
 
   const save = async () => {
     const value = Number(amount.replace(/[^0-9.]/g, ""));
@@ -60,48 +89,68 @@ export default function AddIncome() {
         return;
       }
 
-      const res = await fetch(`${API_URL}/api/income`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          "ngrok-skip-browser-warning": "true",
-        },
-        body: JSON.stringify({
-          amount: value,
-          category,
-          customer: customer === NO_CUSTOMER ? null : customer,
-          date: date.toISOString(),
-          paymentMethod: payment,
-          description,
-        }),
-      });
+      const res = await fetch(
+          isEdit ? `${API_URL}/api/transactions/${id}` : `${API_URL}/api/income`,
+          {
+            method: isEdit ? "PUT" : "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+              "ngrok-skip-browser-warning": "true",
+            },
+            body: JSON.stringify({
+              amount: value,
+              category,
+              customer: customer === NO_CUSTOMER ? null : customer,
+              date: date.toISOString(),
+              paymentMethod: payment,
+              description,
+            }),
+          }
+      );
       const json = await res.json();
 
       if (res.ok && json.success === true) {
         Alert.alert(
             "Success",
-            json.message ?? "Income saved",
+            json.message ?? (isEdit ? "Income updated" : "Income saved"),
             [{ text: "OK", onPress: () => router.back() }],
             { cancelable: false }
         );
         return;
       }
 
-      Alert.alert("Couldn't save income", json.message ?? "Please try again.");
+      Alert.alert(isEdit ? "Couldn't update income" : "Couldn't save income", json.message ?? "Please try again.");
     } catch (err) {
       console.log("Save income error:", err);
-      Alert.alert("Couldn't save income", "Check your connection and try again.");
+      Alert.alert(
+          isEdit ? "Couldn't update income" : "Couldn't save income",
+          "Check your connection and try again."
+      );
     } finally {
       setSaving(false);
     }
   };
 
+  // Edit mode, transaction not loaded yet (or not found)
+  if (isEdit && !existing) {
+    return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top"]}>
+          <Stack.Screen options={{ headerShown: false }} />
+          <ThemedStatusBar />
+          <ScreenHeader title="Edit Income" />
+          <Text style={{ color: C.muted, textAlign: "center", marginTop: 60 }}>
+            {loading ? "Loading..." : "Income not found."}
+          </Text>
+        </SafeAreaView>
+    );
+  }
+
   return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: FC.bg }} edges={["top"]}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top"]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <StatusBar barStyle="light-content" backgroundColor={FC.bg} />
-        <ScreenHeader title="Add Income" />
+        <ThemedStatusBar />
+        <ScreenHeader title={isEdit ? "Edit Income" : "Add Income"} />
 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <ScrollView
@@ -117,7 +166,7 @@ export default function AddIncome() {
                     value={amount}
                     onChangeText={setAmount}
                     placeholder="0"
-                    placeholderTextColor={FC.muted}
+                    placeholderTextColor={C.muted}
                     keyboardType="numeric"
                 />
               </View>
@@ -126,28 +175,28 @@ export default function AddIncome() {
             <Field label="Category">
               <TouchableOpacity style={s.input} activeOpacity={0.7} onPress={() => setCatOpen(true)}>
                 <Text style={s.inputText}>{category}</Text>
-                <Ionicons name="chevron-down" size={18} color={FC.text} />
+                <Ionicons name="chevron-down" size={18} color={C.text} />
               </TouchableOpacity>
             </Field>
 
             <Field label="Customer (optional)">
               <TouchableOpacity style={s.input} activeOpacity={0.7} onPress={() => setCustOpen(true)}>
-                <Text style={[s.inputText, customer === NO_CUSTOMER && { color: FC.muted }]}>{customer}</Text>
-                <Ionicons name="chevron-down" size={18} color={FC.text} />
+                <Text style={[s.inputText, customer === NO_CUSTOMER && { color: C.muted }]}>{customer}</Text>
+                <Ionicons name="chevron-down" size={18} color={C.text} />
               </TouchableOpacity>
             </Field>
 
             <Field label="Date">
               <TouchableOpacity style={s.input} activeOpacity={0.7} onPress={() => setDateOpen(true)}>
                 <Text style={s.inputText}>{formatShortDateObj(date)}</Text>
-                <Ionicons name="calendar-outline" size={20} color={FC.text} />
+                <Ionicons name="calendar-outline" size={20} color={C.text} />
               </TouchableOpacity>
               {dateOpen && (
                   <DateTimePicker
                       value={date}
                       mode="date"
                       display={Platform.OS === "ios" ? "inline" : "default"}
-                      themeVariant="dark"
+                      themeVariant={isDark ? "dark" : "light"}
                       maximumDate={new Date()}
                       onChange={(_, d) => {
                         if (Platform.OS !== "ios") setDateOpen(false);
@@ -165,7 +214,7 @@ export default function AddIncome() {
             <Field label="Payment Method">
               <TouchableOpacity style={s.input} activeOpacity={0.7} onPress={() => setPayOpen(true)}>
                 <Text style={s.inputText}>{payment}</Text>
-                <Ionicons name="chevron-down" size={18} color={FC.text} />
+                <Ionicons name="chevron-down" size={18} color={C.text} />
               </TouchableOpacity>
             </Field>
 
@@ -175,7 +224,7 @@ export default function AddIncome() {
                   value={description}
                   onChangeText={setDescription}
                   placeholder="Where did this income come from?"
-                  placeholderTextColor={FC.muted}
+                  placeholderTextColor={C.muted}
                   multiline
                   textAlignVertical="top"
               />
@@ -187,7 +236,11 @@ export default function AddIncome() {
                 onPress={save}
                 disabled={saving}
             >
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveText}>Save Income</Text>}
+              {saving ? (
+                  <ActivityIndicator color="#fff" />
+              ) : (
+                  <Text style={s.saveText}>{isEdit ? "Update Income" : "Save Income"}</Text>
+              )}
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>

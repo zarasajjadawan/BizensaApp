@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import { useFocusEffect, useRouter } from "expo-router";
 
 import { getCurrency, useCurrency } from "@/constants/currency";
+import { C } from "@/constants/theme";
 
 export const API_URL = "https://sanctuary-unlikable-uncertain.ngrok-free.dev";
 
@@ -135,8 +136,9 @@ export interface ApiInvoice {
   tax: number;
   total: number;
   dueDate: string;
-  status: string; // "unpaid" | "paid" ...
+  status: string;
   createdAt: string;
+  paidAt?: string | null;
 }
 
 export interface ApiSummary {
@@ -353,8 +355,8 @@ export const iconForTransaction = (t: Transaction): TxIcon =>
 
 export const tintForTransaction = (t: Transaction) =>
     t.type === "income"
-        ? { bg: "#12261a", border: "#1f4d31", fg: "#4ade80" }
-        : { bg: "#2a1214", border: "#5c1f24", fg: "#f87171" };
+        ? { bg: C.successBg, border: C.successBorder, fg: C.successFg }
+        : { bg: C.dangerBg, border: C.dangerBorder, fg: C.dangerFg };
 
 /* ---------- Invoices ---------- */
 

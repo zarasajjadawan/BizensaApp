@@ -5,14 +5,14 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  StatusBar,
   LayoutChangeEvent,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Stop, Rect, Line, Text as SvgText } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 
-import { Colors, components } from "@/constants/theme";
+import { C, components, themedStyles } from "@/constants/theme";
+import ThemedStatusBar from "@/components/themed-status-bar";
 import {
   AppData,
   formatCompact,
@@ -21,19 +21,6 @@ import {
   useAppData,
 } from "@/constants/api";
 import { SelectModal } from "@/components/form-parts";
-
-const T = Colors.dark;
-const C = {
-  bg: T.background,
-  card: T.surface,
-  border: T.border,
-  purple: T.primary,
-  purpleSoft: T.primarySoft,
-  text: T.text,
-  muted: T.textSecondary,
-  green: T.success,
-  red: T.danger,
-};
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -251,7 +238,7 @@ export default function Reports() {
 
   return (
       <SafeAreaView style={styles.safe} edges={["top"]}>
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+        <ThemedStatusBar />
         <ScrollView
             contentContainerStyle={{ padding: 20, paddingBottom: bottomSpace }}
             showsVerticalScrollIndicator={false}
@@ -268,19 +255,19 @@ export default function Reports() {
             <View style={{ gap: 22, marginTop: 20 }}>
               <OverviewRow
                   icon="bar-chart-outline"
-                  tint={{ bg: "#12261a", border: "#1f4d31", fg: "#4ade80" }}
+                  tint={{ bg: C.successBg, border: C.successBorder, fg: C.successFg }}
                   label="Revenue"
                   value={formatMoney(data.revenue)}
               />
               <OverviewRow
                   icon="trending-up"
-                  tint={{ bg: "#2a1214", border: "#5c1f24", fg: "#f87171" }}
+                  tint={{ bg: C.dangerBg, border: C.dangerBorder, fg: C.dangerFg }}
                   label="Expenses"
                   value={formatMoney(data.expenses)}
               />
               <OverviewRow
                   icon="analytics-outline"
-                  tint={{ bg: "#1c1030", border: "#4a2390", fg: "#a78bfa" }}
+                  tint={{ bg: C.chipBg, border: C.chipBorder, fg: C.purpleSoft }}
                   label="Net Profit"
                   value={formatMoney(profit)}
               />
@@ -303,7 +290,7 @@ export default function Reports() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   title: { color: C.text, fontSize: 22, fontWeight: "700" },
 
@@ -347,4 +334,4 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: "row", alignItems: "center", gap: 8 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { color: C.muted, fontSize: 13 },
-});
+}));

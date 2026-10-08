@@ -7,26 +7,15 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  StatusBar,
   Alert,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
-import { Colors, components } from "@/constants/theme";
+import { C, components, themedStyles } from "@/constants/theme";
+import ThemedStatusBar from "@/components/themed-status-bar";
 import { API_URL } from "@/constants/api";
 
-const T = Colors.dark;
-const C = {
-  bg: T.background,
-  card: T.surface,
-  border: T.border,
-  purple: T.primary,
-  purpleSoft: T.primarySoft,
-  text: T.text,
-  muted: T.textSecondary,
-  red: T.danger,
-};
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -126,7 +115,7 @@ export default function Profile() {
 
   return (
       <SafeAreaView style={styles.safe} edges={["top"]}>
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+        <ThemedStatusBar />
 
         <View style={styles.topBar}>
           <Text style={styles.title}>Profile</Text>
@@ -150,6 +139,7 @@ export default function Profile() {
             </View>
           </View>
 
+          {/* Business (display only, not touchable) */}
           <View style={styles.businessCard}>
             <View>
               <Text style={styles.businessLabel}>Business</Text>
@@ -187,7 +177,7 @@ export default function Profile() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   topBar: { height: 52, alignItems: "center", justifyContent: "center" },
@@ -199,9 +189,9 @@ const styles = StyleSheet.create({
     width: 74,
     height: 74,
     borderRadius: 37,
-    backgroundColor: "#1c1030",
+    backgroundColor: C.chipBg,
     borderWidth: 2,
-    borderColor: "#4a2390",
+    borderColor: C.chipBorder,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -251,7 +241,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: C.red,
-    backgroundColor: "#1c0a0c",
+    backgroundColor: C.dangerBg,
   },
   logoutText: { color: C.red, fontSize: 16, fontWeight: "600" },
-});
+}));

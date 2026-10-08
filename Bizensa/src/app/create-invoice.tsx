@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  StatusBar,
   Modal,
   Pressable,
   Platform,
@@ -20,22 +19,12 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from "@/constants/theme";
+import { C, themedStyles, useAppTheme } from "@/constants/theme";
+import ThemedStatusBar from "@/components/themed-status-bar";
 import { InvoiceItem, TAX_RATE, formatShortDateObj } from "@/constants/invoices";
-import { API_URL, formatMoney, useCustomers } from "@/constants/api";
+import { API_URL, formatMoney, useAppData, useCustomers } from "@/constants/api";
 import { useCurrency } from "@/constants/currency";
 
-const T = Colors.dark;
-const C = {
-  bg: T.background,
-  card: T.surface,
-  border: T.border,
-  purple: T.primary,
-  purpleSoft: T.primarySoft,
-  text: T.text,
-  muted: T.textSecondary,
-  red: T.danger,
-};
 
 const SummaryRow = ({ label, value }: { label: string; value: string }) => (
     <View style={styles.sumRow}>
@@ -44,11 +33,26 @@ const SummaryRow = ({ label, value }: { label: string; value: string }) => (
     </View>
 );
 
+/**
+ * Create invoice  -> open without params
+ * Edit invoice    -> open with params { id: "<invoice _id>" }
+ */
 export default function CreateInvoice() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isDark } = useAppTheme();
   const { customers } = useCustomers();
   const { symbol } = useCurrency();
+
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const isEdit = !!id;
+
+  // Only needed to find the invoice when editing
+  const { data, loading } = useAppData();
+  const existing = useMemo(
+      () => (isEdit ? data.invoices.find((i) => i._id === id) : undefined),
+      [isEdit, data.invoices, id]
+  );
 
   const [customer, setCustomer] = useState("");
   const [items, setItems] = useState<InvoiceItem[]>([]);
@@ -67,6 +71,23 @@ export default function CreateInvoice() {
   const [itemName, setItemName] = useState("");
   const [itemQty, setItemQty] = useState("1");
   const [itemPrice, setItemPrice] = useState("");
+
+  // Edit mode: fill the form once with the saved invoice
+  const filled = useRef(false);
+  useEffect(() => {
+    if (!existing || filled.current) return;
+    filled.current = true;
+    setCustomer(existing.customer ?? "");
+    setItems(
+        existing.items.map((it, idx) => ({
+          id: `${Date.now()}-${idx}`,
+          name: it.name,
+          qty: it.qty,
+          price: it.price,
+        }))
+    );
+    setDueDate(new Date(existing.dueDate));
+  }, [existing]);
 
   const { subtotal, tax, total } = useMemo(() => {
     const sub = items.reduce((s, i) => s + i.qty * i.price, 0);
@@ -91,9 +112,9 @@ export default function CreateInvoice() {
     setItemOpen(false);
   };
 
-  const removeItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
+  const removeItem = (itemId: string) => setItems((prev) => prev.filter((i) => i.id !== itemId));
 
-  const create = async () => {
+  const save = async () => {
     if (!customer) {
       Alert.alert("Select a customer", "Choose a customer or add one first.");
       return;
@@ -110,53 +131,83 @@ export default function CreateInvoice() {
         return;
       }
 
-      const res = await fetch(`${API_URL}/api/invoices`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          "ngrok-skip-browser-warning": "true",
-        },
-        body: JSON.stringify({
-          customer,
-          items: items.map(({ name, qty, price }) => ({ name, qty, price })),
-          subtotal,
-          tax,
-          total,
-          dueDate: dueDate.toISOString(),
-        }),
-      });
+      const res = await fetch(
+          isEdit ? `${API_URL}/api/invoices/${id}` : `${API_URL}/api/invoices`,
+          {
+            method: isEdit ? "PUT" : "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+              "ngrok-skip-browser-warning": "true",
+            },
+            body: JSON.stringify({
+              customer,
+              items: items.map(({ name, qty, price }) => ({ name, qty, price })),
+              subtotal,
+              tax,
+              total,
+              dueDate: dueDate.toISOString(),
+            }),
+          }
+      );
       const json = await res.json();
 
       if (res.ok && json.success === true) {
         Alert.alert(
             "Success",
-            json.message ?? "Invoice created",
+            json.message ?? (isEdit ? "Invoice updated" : "Invoice created"),
             [{ text: "OK", onPress: () => router.back() }],
             { cancelable: false }
         );
         return;
       }
 
-      Alert.alert("Couldn't create invoice", json.message ?? "Please try again.");
+      Alert.alert(
+          isEdit ? "Couldn't save changes" : "Couldn't create invoice",
+          json.message ?? "Please try again."
+      );
     } catch (err) {
-      console.log("Create invoice error:", err);
-      Alert.alert("Couldn't create invoice", "Check your connection and try again.");
+      console.log("Save invoice error:", err);
+      Alert.alert(
+          isEdit ? "Couldn't save changes" : "Couldn't create invoice",
+          "Check your connection and try again."
+      );
     } finally {
       setSaving(false);
     }
   };
 
+  // Edit mode, invoice not loaded yet (or not found)
+  if (isEdit && !existing) {
+    return (
+        <SafeAreaView style={styles.safe} edges={["top"]}>
+          <Stack.Screen options={{ headerShown: false }} />
+          <ThemedStatusBar />
+          <View style={styles.topBar}>
+            <TouchableOpacity style={styles.back} onPress={() => router.back()} hitSlop={12}>
+              <Ionicons name="chevron-back" size={26} color={C.text} />
+            </TouchableOpacity>
+            <Text style={styles.title}>Edit Invoice</Text>
+          </View>
+          <Text style={{ color: C.muted, textAlign: "center", marginTop: 60 }}>
+            {loading ? "Loading..." : "Invoice not found."}
+          </Text>
+        </SafeAreaView>
+    );
+  }
+
   return (
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+        <ThemedStatusBar />
 
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.back} onPress={() => router.back()} hitSlop={12}>
             <Ionicons name="chevron-back" size={26} color={C.text} />
           </TouchableOpacity>
-          <Text style={styles.title}>Create Invoice</Text>
+          <Text style={styles.title}>
+            {isEdit ? `Edit ${existing?.invoiceNumber ?? "Invoice"}` : "Create Invoice"}
+          </Text>
         </View>
 
         <ScrollView
@@ -219,8 +270,9 @@ export default function CreateInvoice() {
                   value={dueDate}
                   mode="date"
                   display={Platform.OS === "ios" ? "inline" : "default"}
-                  themeVariant="dark"
-                  minimumDate={new Date()}
+                  themeVariant={isDark ? "dark" : "light"}
+                  // when editing, the saved due date may already be in the past
+                  minimumDate={isEdit ? undefined : new Date()}
                   onChange={(_, d) => {
                     if (Platform.OS !== "ios") setDateOpen(false);
                     if (d) setDueDate(d);
@@ -236,10 +288,14 @@ export default function CreateInvoice() {
           <TouchableOpacity
               style={[styles.createBtn, saving && { opacity: 0.7 }]}
               activeOpacity={0.85}
-              onPress={create}
+              onPress={save}
               disabled={saving}
           >
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.createText}>Create Invoice</Text>}
+            {saving ? (
+                <ActivityIndicator color="#fff" />
+            ) : (
+                <Text style={styles.createText}>{isEdit ? "Save Changes" : "Create Invoice"}</Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
 
@@ -318,7 +374,7 @@ export default function CreateInvoice() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 20, paddingTop: 8 },
 
@@ -432,4 +488,4 @@ const styles = StyleSheet.create({
     color: C.text,
     fontSize: 15,
   },
-});
+}));

@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import {
   View,
   Text,
@@ -10,7 +10,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  StatusBar,
   Modal,
   Pressable,
   Platform,
@@ -22,22 +21,12 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from "@/constants/theme";
-import { API_URL } from "@/constants/api";
+import { C, themedStyles, useAppTheme } from "@/constants/theme";
+import ThemedStatusBar from "@/components/themed-status-bar";
+import { API_URL, buildTransactions, useAppData } from "@/constants/api";
 import { useCurrency } from "@/constants/currency";
 
 /* ---------- Theme ---------- */
-const T = Colors.dark;
-const C = {
-  bg: T.background,
-  card: T.surface,
-  border: T.border,
-  purple: T.primary,
-  purpleSoft: T.primarySoft,
-  purpleDark: T.primaryDark,
-  text: T.text,
-  muted: T.textSecondary,
-};
 
 const CATEGORIES = ["Office", "Travel", "Food", "Utilities", "Salaries", "Marketing", "Other"];
 const PAYMENT_METHODS = ["Cash", "Bank Account", "Credit Card", "Mobile Wallet"];
@@ -94,23 +83,53 @@ const SelectModal = ({
     </Modal>
 );
 
-/* ---------- Screen ---------- */
+/* ---------- Screen ----------
+ * Add expense  -> open without params
+ * Edit expense -> open with params { id: "<transaction id>" }
+ */
 export default function AddExpense() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isDark } = useAppTheme();
   const { symbol } = useCurrency();
+
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const isEdit = !!id;
+
+  // Only needed to find the transaction when editing
+  const { data, loading } = useAppData();
+  const existing = useMemo(
+      () => (isEdit ? buildTransactions(data).find((t) => t.id === id) : undefined),
+      [isEdit, data, id]
+  );
 
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [date, setDate] = useState(new Date());
   const [payment, setPayment] = useState(PAYMENT_METHODS[1]);
   const [description, setDescription] = useState("");
+  // Either a saved receipt URL (edit mode) or a newly picked local file
   const [receipt, setReceipt] = useState<string | null>(null);
+  const [receiptChanged, setReceiptChanged] = useState(false);
 
   const [catOpen, setCatOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Edit mode: fill the form once with the saved expense
+  const filled = useRef(false);
+  useEffect(() => {
+    if (!existing || filled.current) return;
+    filled.current = true;
+    setAmount(String(existing.amount ?? ""));
+    setCategory(existing.category || CATEGORIES[0]);
+    setDate(existing.date ? new Date(existing.date) : new Date());
+    setPayment(existing.paymentMethod || PAYMENT_METHODS[1]);
+    setDescription(existing.description ?? "");
+    const savedReceipt = (existing as any).receipt ?? (existing as any).receiptUrl ?? null;
+    setReceipt(typeof savedReceipt === "string" && savedReceipt ? savedReceipt : null);
+  }, [existing]);
 
   const pickReceipt = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -122,7 +141,10 @@ export default function AddExpense() {
       mediaTypes: ["images"],
       quality: 0.7,
     });
-    if (!res.canceled) setReceipt(res.assets[0].uri);
+    if (!res.canceled) {
+      setReceipt(res.assets[0].uri);
+      setReceiptChanged(true);
+    }
   };
 
   const save = async () => {
@@ -146,53 +168,84 @@ export default function AddExpense() {
       form.append("date", date.toISOString());
       form.append("paymentMethod", payment);
       form.append("description", description);
-      if (receipt) {
+      // Upload only a newly picked image (not the already saved URL)
+      if (receipt && receiptChanged) {
         form.append("receipt", {
           uri: receipt,
           name: "receipt.jpg",
           type: "image/jpeg",
         } as any);
       }
+      // User removed the saved receipt without picking a new one
+      if (isEdit && receiptChanged && !receipt) {
+        form.append("removeReceipt", "true");
+      }
 
-      const res = await fetch(`${API_URL}/api/expenses`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "ngrok-skip-browser-warning": "true",
-        },
-        body: form,
-      });
+      const res = await fetch(
+          isEdit ? `${API_URL}/api/transactions/${id}` : `${API_URL}/api/expenses`,
+          {
+            method: isEdit ? "PUT" : "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "ngrok-skip-browser-warning": "true",
+            },
+            body: form,
+          }
+      );
       const json = await res.json();
 
       if (res.ok && json.success === true) {
         Alert.alert(
             "Success",
-            json.message ?? "Expense saved",
+            json.message ?? (isEdit ? "Expense updated" : "Expense saved"),
             [{ text: "OK", onPress: () => router.back() }],
             { cancelable: false }
         );
         return;
       }
 
-      Alert.alert("Couldn't save expense", json.message ?? "Please try again.");
+      Alert.alert(isEdit ? "Couldn't update expense" : "Couldn't save expense", json.message ?? "Please try again.");
     } catch (err) {
       console.log("Save expense error:", err);
-      Alert.alert("Couldn't save expense", "Check your connection and try again.");
+      Alert.alert(
+          isEdit ? "Couldn't update expense" : "Couldn't save expense",
+          "Check your connection and try again."
+      );
     } finally {
       setSaving(false);
     }
   };
 
+  // Edit mode, transaction not loaded yet (or not found)
+  if (isEdit && !existing) {
+    return (
+        <SafeAreaView style={styles.safe} edges={["top"]}>
+          <Stack.Screen options={{ headerShown: false }} />
+          <ThemedStatusBar />
+          <View style={styles.topBar}>
+            <TouchableOpacity style={styles.back} onPress={() => router.back()} hitSlop={12}>
+              <Ionicons name="chevron-back" size={26} color={C.text} />
+            </TouchableOpacity>
+            <Text style={styles.title}>Edit Expense</Text>
+          </View>
+          <Text style={{ color: C.muted, textAlign: "center", marginTop: 60 }}>
+            {loading ? "Loading..." : "Expense not found."}
+          </Text>
+        </SafeAreaView>
+    );
+  }
+
   return (
       <SafeAreaView style={styles.safe} edges={["top"]}>
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+        <Stack.Screen options={{ headerShown: false }} />
+        <ThemedStatusBar />
 
         {/* Top bar */}
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.back} onPress={() => router.back()} hitSlop={12}>
             <Ionicons name="chevron-back" size={26} color={C.text} />
           </TouchableOpacity>
-          <Text style={styles.title}>Add Expense</Text>
+          <Text style={styles.title}>{isEdit ? "Edit Expense" : "Add Expense"}</Text>
         </View>
 
         <KeyboardAvoidingView
@@ -235,7 +288,7 @@ export default function AddExpense() {
                       value={date}
                       mode="date"
                       display={Platform.OS === "ios" ? "inline" : "default"}
-                      themeVariant="dark"
+                      themeVariant={isDark ? "dark" : "light"}
                       maximumDate={new Date()}
                       onChange={(_, d) => {
                         if (Platform.OS !== "ios") setDateOpen(false);
@@ -273,8 +326,14 @@ export default function AddExpense() {
               {receipt ? (
                   <View style={styles.receiptBox}>
                     <Image source={{ uri: receipt }} style={styles.receiptImg} />
-                    <TouchableOpacity style={styles.removeReceipt} onPress={() => setReceipt(null)}>
-                      <Ionicons name="close" size={16} color={C.text} />
+                    <TouchableOpacity
+                        style={styles.removeReceipt}
+                        onPress={() => {
+                          setReceipt(null);
+                          setReceiptChanged(true);
+                        }}
+                    >
+                      <Ionicons name="close" size={16} color="#fff" />
                     </TouchableOpacity>
                   </View>
               ) : (
@@ -291,7 +350,11 @@ export default function AddExpense() {
                 onPress={save}
                 disabled={saving}
             >
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Save Expense</Text>}
+              {saving ? (
+                  <ActivityIndicator color="#fff" />
+              ) : (
+                  <Text style={styles.saveText}>{isEdit ? "Update Expense" : "Save Expense"}</Text>
+              )}
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -317,7 +380,7 @@ export default function AddExpense() {
 }
 
 /* ---------- Styles ---------- */
-const styles = StyleSheet.create({
+const styles = themedStyles((C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 20, paddingTop: 8 },
 
@@ -398,4 +461,4 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   optionText: { color: C.text, fontSize: 15 },
-});
+}));

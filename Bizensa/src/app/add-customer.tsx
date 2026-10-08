@@ -1,12 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import {
   Text,
   TextInput,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
   Platform,
   Alert,
   ActivityIndicator,
@@ -14,12 +13,21 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Field, FC, ScreenHeader, formStyles as s } from "@/components/form-parts";
-import { API_URL } from "@/constants/api";
+import { Field, ScreenHeader, formStyles as s } from "@/components/form-parts";
+import { C, useAppTheme } from "@/constants/theme";
+import ThemedStatusBar from "@/components/themed-status-bar";
+import { API_URL, useCustomers } from "@/constants/api";
 
 export default function AddCustomer() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  useAppTheme();
+
+  // When an id is passed (from Customer Details > Edit) this screen edits that customer
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const isEdit = !!id;
+  const { customers } = useCustomers();
+  const filled = useRef(false);
 
   const [name, setName] = useState("");
   const [business, setBusiness] = useState("");
@@ -27,6 +35,21 @@ export default function AddCustomer() {
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Fill the form once with the saved values (edit mode only)
+  useEffect(() => {
+    if (!isEdit || filled.current) return;
+
+    const c = customers.find((x) => x._id === id);
+    if (!c) return;
+
+    setName(c.name ?? "");
+    setBusiness(c.businessName ?? "");
+    setPhone(c.phone ?? "");
+    setEmail(c.email ?? "");
+    setAddress(c.address ?? "");
+    filled.current = true;
+  }, [isEdit, id, customers]);
 
   const save = async () => {
     if (!name.trim()) {
@@ -46,8 +69,8 @@ export default function AddCustomer() {
         return;
       }
 
-      const res = await fetch(`${API_URL}/api/customers`, {
-        method: "POST",
+      const res = await fetch(`${API_URL}/api/customers${isEdit ? `/${id}` : ""}`, {
+        method: isEdit ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -77,10 +100,10 @@ export default function AddCustomer() {
   };
 
   return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: FC.bg }} edges={["top"]}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top"]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <StatusBar barStyle="light-content" backgroundColor={FC.bg} />
-        <ScreenHeader title="Add Customer" />
+        <ThemedStatusBar />
+        <ScreenHeader title={isEdit ? "Edit Customer" : "Add Customer"} />
 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <ScrollView
@@ -90,44 +113,44 @@ export default function AddCustomer() {
           >
             <Field label="Customer Name">
               <TextInput
-                  style={[s.input, { color: FC.text, fontSize: 15 }]}
+                  style={[s.input, { color: C.text, fontSize: 15 }]}
                   value={name}
                   onChangeText={setName}
                   placeholder="e.g. John Smith"
-                  placeholderTextColor={FC.muted}
+                  placeholderTextColor={C.muted}
                   autoCapitalize="words"
               />
             </Field>
 
             <Field label="Business Name (optional)">
               <TextInput
-                  style={[s.input, { color: FC.text, fontSize: 15 }]}
+                  style={[s.input, { color: C.text, fontSize: 15 }]}
                   value={business}
                   onChangeText={setBusiness}
                   placeholder="e.g. ABC Company"
-                  placeholderTextColor={FC.muted}
+                  placeholderTextColor={C.muted}
                   autoCapitalize="words"
               />
             </Field>
 
             <Field label="Phone">
               <TextInput
-                  style={[s.input, { color: FC.text, fontSize: 15 }]}
+                  style={[s.input, { color: C.text, fontSize: 15 }]}
                   value={phone}
                   onChangeText={setPhone}
                   placeholder="e.g. 0300 1234567"
-                  placeholderTextColor={FC.muted}
+                  placeholderTextColor={C.muted}
                   keyboardType="phone-pad"
               />
             </Field>
 
             <Field label="Email">
               <TextInput
-                  style={[s.input, { color: FC.text, fontSize: 15 }]}
+                  style={[s.input, { color: C.text, fontSize: 15 }]}
                   value={email}
                   onChangeText={setEmail}
                   placeholder="name@company.com"
-                  placeholderTextColor={FC.muted}
+                  placeholderTextColor={C.muted}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -140,7 +163,7 @@ export default function AddCustomer() {
                   value={address}
                   onChangeText={setAddress}
                   placeholder="Street, city"
-                  placeholderTextColor={FC.muted}
+                  placeholderTextColor={C.muted}
                   multiline
                   textAlignVertical="top"
               />
@@ -152,7 +175,11 @@ export default function AddCustomer() {
                 onPress={save}
                 disabled={saving}
             >
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveText}>Save Customer</Text>}
+              {saving ? (
+                  <ActivityIndicator color="#fff" />
+              ) : (
+                  <Text style={s.saveText}>{isEdit ? "Save Changes" : "Save Customer"}</Text>
+              )}
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>

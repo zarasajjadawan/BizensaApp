@@ -1,9 +1,9 @@
+import React from "react";
 import { Tabs } from "expo-router";
 import { View } from "react-native";
-import clsx from "clsx";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors, components } from "@/constants/theme";
+import { C, components, useAppTheme } from "@/constants/theme";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -23,22 +23,25 @@ const TABS: TabConfig[] = [
 ];
 
 const tabBar = components.tabBar;
-const colors = Colors.dark;
 
-const TabIcon = ({ focused, tab }: { focused: boolean; tab: TabConfig }) => (
-    <View className="tabs-icon">
-        <View className={clsx("tabs-pill", focused && "tabs-active")}>
-            <Ionicons
-                name={focused ? tab.iconActive : tab.icon}
-                size={24}
-                color={focused ? colors.selectedTab : colors.textSecondary}
-            />
+const TabIcon = ({ focused, tab }: { focused: boolean; tab: TabConfig }) => {
+    useAppTheme(); // re-render when the theme changes
+    return (
+        <View className="tabs-icon">
+            <View className="tabs-pill">
+                <Ionicons
+                    name={focused ? tab.iconActive : tab.icon}
+                    size={24}
+                    color={focused ? C.purple : C.muted}
+                />
+            </View>
         </View>
-    </View>
-);
+    );
+};
 
 const TabLayout = () => {
     const insets = useSafeAreaInsets();
+    useAppTheme(); // tabBarStyle must be rebuilt when the theme changes
 
     return (
         <Tabs
@@ -51,11 +54,11 @@ const TabLayout = () => {
                     height: tabBar.height,
                     marginHorizontal: tabBar.horizontalInset,
                     borderRadius: tabBar.radius,
-                    backgroundColor: colors.surface,
+                    backgroundColor: C.card,
                     borderWidth: 1,
-                    borderColor: colors.border,
+                    borderColor: C.border,
                     borderTopWidth: 1,
-                    borderTopColor: colors.border,
+                    borderTopColor: C.border,
                     elevation: 0,
                 },
                 tabBarItemStyle: {

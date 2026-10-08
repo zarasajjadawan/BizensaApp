@@ -10,6 +10,7 @@ export interface IInvoice {
     total: number;
     dueDate: Date;
     status: "unpaid" | "paid" | "overdue";
+    paidAt?: Date | null;
 }
 
 const invoiceSchema = new Schema<IInvoice>(
@@ -30,6 +31,7 @@ const invoiceSchema = new Schema<IInvoice>(
         total: { type: Number, required: true },
         dueDate: { type: Date, required: true },
         status: { type: String, enum: ["unpaid", "paid", "overdue"], default: "unpaid" },
+        paidAt: { type: Date, default: null },
     },
     { timestamps: true }
 );

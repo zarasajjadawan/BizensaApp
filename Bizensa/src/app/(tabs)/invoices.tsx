@@ -1,18 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { useRouter } from "expo-router";
-import {
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  StatusBar,
-} from "react-native";
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
-import { Colors, components } from "@/constants/theme";
+import { C, components, themedStyles } from "@/constants/theme";
+import ThemedStatusBar from "@/components/themed-status-bar";
 import {
   ApiInvoice,
   InvoiceStatus,
@@ -24,16 +17,6 @@ import {
   useAppData,
 } from "@/constants/api";
 
-const T = Colors.dark;
-const C = {
-  bg: T.background,
-  card: T.surface,
-  border: T.border,
-  purple: T.primary,
-  text: T.text,
-  muted: T.textSecondary,
-};
-
 type Filter = "all" | InvoiceStatus;
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "All" },
@@ -44,6 +27,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 
 const InvoiceCard = ({ item, onPress }: { item: ApiInvoice; onPress: () => void }) => {
   const status = invoiceStatus(item);
+  const isPaid = status === "paid";
   return (
       <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={onPress}>
         <View style={styles.cardRow}>
@@ -52,7 +36,13 @@ const InvoiceCard = ({ item, onPress }: { item: ApiInvoice; onPress: () => void 
         </View>
         <Text style={styles.customer}>{item.customer}</Text>
         <View style={styles.cardRow}>
-          <Text style={styles.date}>Due {formatShortDate(item.dueDate)}</Text>
+          <Text style={styles.date}>
+            {isPaid
+                ? item.paidAt
+                    ? `Paid ${formatShortDate(item.paidAt)}`
+                    : "Paid"
+                : `Due ${formatShortDate(item.dueDate)}`}
+          </Text>
           <Text style={[styles.status, { color: STATUS_COLOR[status] }]}>
             {STATUS_LABEL[status]}
           </Text>
@@ -88,7 +78,7 @@ export default function Invoices() {
 
   return (
       <SafeAreaView style={styles.safe} edges={["top"]}>
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+        <ThemedStatusBar />
 
         <View style={styles.header}>
           <Text style={styles.title}>Invoices</Text>
@@ -147,7 +137,7 @@ export default function Invoices() {
                   key={inv._id}
                   item={inv}
                   onPress={() => {
-                    // TODO: open an invoice details screen (e.g. /invoice/[id])
+                    router.push({ pathname: "/invoice-details", params: { id: inv._id } })
                   }}
               />
           ))}
@@ -164,7 +154,7 @@ export default function Invoices() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: "row",
@@ -237,4 +227,4 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
   },
-});
+}));

@@ -1,39 +1,21 @@
 import { useState } from "react";
-import {
-    Alert,
-    ActivityIndicator,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-} from "react-native";
+import { Alert, Text, TouchableOpacity, View } from "react-native";
 import { Link, useRouter } from "expo-router";
-import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
-import { styled } from "nativewind";
 import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
-import {API_URL} from "@/constants/api";
 
-const SafeAreaView = styled(RNSafeAreaView);
-
-
-// const API_URL = "http://localhost:3000";
-// const API_URL = "http://192.168.90.60:3000";
-// const API_URL = "http://127.0.0.1:4041";
-
-const inputStyle = {
-    width: "100%",
-    color: "white",
-    backgroundColor: "#171717",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#262626",
-};
+import { API_URL } from "@/constants/api";
+import { C } from "@/constants/theme";
+import {
+    AuthInput,
+    AuthScreen,
+    BackButton,
+    FooterLink,
+    Label,
+    PasswordInput,
+    PrimaryButton,
+    Title,
+} from "@/components/auth-parts";
 
 const SignUp = () => {
     const router = useRouter();
@@ -58,34 +40,20 @@ const SignUp = () => {
             password: form.password,
         };
 
-        if (
-            !payload.name ||
-            !payload.businessName ||
-            !payload.email ||
-            !payload.password
-        ) {
+        if (!payload.name || !payload.businessName || !payload.email || !payload.password) {
             Alert.alert("Missing details", "Please fill in all fields.");
             return;
         }
-
         if (!/^\S+@\S+\.\S+$/.test(payload.email)) {
             Alert.alert("Invalid email", "Please enter a valid email address.");
             return;
         }
-
         if (payload.password.length < 6) {
-            Alert.alert(
-                "Weak password",
-                "Password must be at least 6 characters."
-            );
+            Alert.alert("Weak password", "Password must be at least 6 characters.");
             return;
         }
-
         if (!agreed) {
-            Alert.alert(
-                "Terms required",
-                "Please accept the Terms & Conditions to continue."
-            );
+            Alert.alert("Terms required", "Please accept the Terms & Conditions to continue.");
             return;
         }
 
@@ -98,34 +66,22 @@ const SignUp = () => {
                 body: JSON.stringify(payload),
             });
 
-            let data = {};
+            let data: any = {};
             try {
                 data = await res.json();
             } catch (_) {}
 
             if (!res.ok || data?.success === false) {
-                Alert.alert(
-                    "Sign up failed",
-                    data?.message || `Server error (${res.status})`
-                );
+                Alert.alert("Sign up failed", data?.message || `Server error (${res.status})`);
                 return;
             }
 
             const token = data?.data?.token;
-            if (token) {
-                await SecureStore.setItemAsync("token", token);
-            }
+            if (token) await SecureStore.setItemAsync("token", token);
 
-            Alert.alert(
-                "Success",
-                data?.message || "Your account has been created.",
-                [
-                    {
-                        text: "OK",
-                        onPress: () => router.replace("/(auth)/sign-in"),
-                    },
-                ]
-            );
+            Alert.alert("Success", data?.message || "Your account has been created.", [
+                { text: "OK", onPress: () => router.replace("/(auth)/sign-in") },
+            ]);
         } catch (err) {
             console.log("Sign up error:", err);
             Alert.alert(
@@ -138,208 +94,82 @@ const SignUp = () => {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-black" edges={["top", "bottom"]}>
-            <KeyboardAvoidingView
-                className="flex-1"
-                behavior={Platform.OS === "ios" ? "padding" : undefined}
-            >
-                <ScrollView
-                    className="flex-1"
-                    contentContainerStyle={{
-                        flexGrow: 1,
-                        width: "100%",
+        <AuthScreen>
+            <BackButton />
+            <Title title="Create Account" subtitle="Let's get you started" />
+
+            <Label top={32}>Full Name</Label>
+            <AuthInput
+                value={form.fullName}
+                onChangeText={(t) => setForm({ ...form, fullName: t })}
+                placeholder="John Doe"
+                autoCorrect={false}
+                editable={!loading}
+            />
+
+            <Label>Business Name</Label>
+            <AuthInput
+                value={form.businessName}
+                onChangeText={(t) => setForm({ ...form, businessName: t })}
+                placeholder="Your business name"
+                autoCorrect={false}
+                editable={!loading}
+            />
+
+            <Label>Email</Label>
+            <AuthInput
+                value={form.email}
+                onChangeText={(t) => setForm({ ...form, email: t })}
+                placeholder="you@example.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+            />
+
+            <Label>Password</Label>
+            <PasswordInput
+                value={form.password}
+                onChangeText={(t) => setForm({ ...form, password: t })}
+                placeholder="At least 6 characters"
+                show={showPassword}
+                onToggle={() => setShowPassword(!showPassword)}
+                editable={!loading}
+            />
+
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 20 }}>
+                <TouchableOpacity
+                    onPress={() => setAgreed(!agreed)}
+                    style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 6,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        marginRight: 12,
+                        backgroundColor: agreed ? C.purple : "transparent",
+                        borderWidth: agreed ? 0 : 1,
+                        borderColor: C.border,
                     }}
-                    keyboardShouldPersistTaps="handled"
-                    showsVerticalScrollIndicator={false}
                 >
-                    <View
-                        className="flex-1"
-                        style={{
-                            paddingHorizontal: 20,
-                            width: "100%",
-                        }}
-                    >
-                        {/* Back button */}
-                        <TouchableOpacity
-                            onPress={() => router.back()}
-                            className="w-10 h-10 items-center justify-center -ml-2 mt-2"
-                        >
-                            <Ionicons
-                                name="chevron-back"
-                                color="#ffffff"
-                                size={26}
-                            />
-                        </TouchableOpacity>
+                    {agreed && <Ionicons name="checkmark" color="#ffffff" size={14} />}
+                </TouchableOpacity>
 
-                        {/* Header */}
-                        <View className="mt-6">
-                            <Text className="text-white text-3xl font-bold">
-                                Create Account
-                            </Text>
+                <Text style={{ color: C.muted, fontSize: 14 }}>
+                    I agree to{" "}
+                    <Text style={{ color: C.purpleSoft, fontWeight: "500" }}>Terms & Conditions</Text>
+                </Text>
+            </View>
 
-                            <Text className="text-gray-400 text-base mt-1">
-                                Let's get you started
-                            </Text>
-                        </View>
+            <PrimaryButton label="Create Account" loading={loading} onPress={handleSignUp} />
 
-                        {/* Full Name */}
-                        <View className="mt-8 w-full">
-                            <Text className="text-white text-base mb-2">
-                                Full Name
-                            </Text>
-
-                            <TextInput
-                                value={form.fullName}
-                                onChangeText={(t) =>
-                                    setForm({ ...form, fullName: t })
-                                }
-                                placeholder="John Doe"
-                                placeholderTextColor="#6b7280"
-                                autoCorrect={false}
-                                editable={!loading}
-                                style={inputStyle}
-                            />
-                        </View>
-
-                        {/* Business Name */}
-                        <View className="mt-5 w-full">
-                            <Text className="text-white text-base mb-2">
-                                Business Name
-                            </Text>
-
-                            <TextInput
-                                value={form.businessName}
-                                onChangeText={(t) =>
-                                    setForm({ ...form, businessName: t })
-                                }
-                                placeholder="Your business name"
-                                placeholderTextColor="#6b7280"
-                                autoCorrect={false}
-                                editable={!loading}
-                                style={inputStyle}
-                            />
-                        </View>
-
-                        {/* Email */}
-                        <View className="mt-5 w-full">
-                            <Text className="text-white text-base mb-2">
-                                Email
-                            </Text>
-
-                            <TextInput
-                                value={form.email}
-                                onChangeText={(t) =>
-                                    setForm({ ...form, email: t })
-                                }
-                                placeholder="you@example.com"
-                                placeholderTextColor="#6b7280"
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                editable={!loading}
-                                style={inputStyle}
-                            />
-                        </View>
-
-                        {/* Password */}
-                        <View className="mt-5 w-full">
-                            <Text className="text-white text-base mb-2">
-                                Password
-                            </Text>
-
-                            <View className="w-full flex-row items-center bg-neutral-900 rounded-xl border border-neutral-800 px-4">
-                                <TextInput
-                                    value={form.password}
-                                    onChangeText={(t) =>
-                                        setForm({ ...form, password: t })
-                                    }
-                                    placeholder="At least 6 characters"
-                                    placeholderTextColor="#6b7280"
-                                    secureTextEntry={!showPassword}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                    editable={!loading}
-                                    className="flex-1 text-white py-4"
-                                />
-
-                                <TouchableOpacity
-                                    onPress={() => setShowPassword(!showPassword)}
-                                    className="ml-2 p-1"
-                                >
-                                    <Ionicons
-                                        name={
-                                            showPassword
-                                                ? "eye-off-outline"
-                                                : "eye-outline"
-                                        }
-                                        size={22}
-                                        color="#9ca3af"
-                                    />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
-                        {/* Terms checkbox */}
-                        <View className="flex-row items-center mt-5">
-                            <TouchableOpacity
-                                onPress={() => setAgreed(!agreed)}
-                                className={`w-5 h-5 rounded-md items-center justify-center mr-3 ${
-                                    agreed
-                                        ? "bg-foreground"
-                                        : "border border-neutral-700"
-                                }`}
-                            >
-                                {agreed && (
-                                    <Ionicons
-                                        name="checkmark"
-                                        color="#ffffff"
-                                        size={14}
-                                    />
-                                )}
-                            </TouchableOpacity>
-
-                            <Text className="text-gray-400 text-sm">
-                                I agree to{" "}
-                                <Text className="text-[#7524E8] font-medium">
-                                    Terms & Conditions
-                                </Text>
-                            </Text>
-                        </View>
-
-                        {/* Create Account Button */}
-                        <TouchableOpacity
-                            onPress={handleSignUp}
-                            disabled={loading}
-                            activeOpacity={0.8}
-                            className={`w-full bg-foreground rounded-xl py-4 mt-8 items-center justify-center ${
-                                loading ? "opacity-60" : ""
-                            }`}
-                        >
-                            {loading ? (
-                                <ActivityIndicator color="#ffffff" />
-                            ) : (
-                                <Text className="text-white text-center text-base font-semibold">
-                                    Create Account
-                                </Text>
-                            )}
-                        </TouchableOpacity>
-
-                        {/* Login */}
-                        <View className="w-full items-center justify-center mt-8 mb-6">
-                            <Text className="text-gray-400 text-center">
-                                Already have an account?{" "}
-                                <Link
-                                    href="/(auth)/sign-in"
-                                    className="text-[#7524E8] font-medium"
-                                >
-                                    Login
-                                </Link>
-                            </Text>
-                        </View>
-                    </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
+            <FooterLink>
+                Already have an account?{" "}
+                <Link href="/(auth)/sign-in" style={{ color: C.purpleSoft, fontWeight: "500" }}>
+                    Login
+                </Link>
+            </FooterLink>
+        </AuthScreen>
     );
 };
 

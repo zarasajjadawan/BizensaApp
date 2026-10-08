@@ -6,14 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  StatusBar,
   Alert,
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from "@/constants/theme";
+import { C, themedStyles } from "@/constants/theme";
+import ThemedStatusBar from "@/components/themed-status-bar";
 import {
   buildTransactions,
   deleteTransaction,
@@ -21,17 +21,6 @@ import {
   formatMoney,
   useAppData,
 } from "@/constants/api";
-
-const T = Colors.dark;
-const C = {
-  bg: T.background,
-  card: T.surface,
-  border: T.border,
-  text: T.text,
-  muted: T.textSecondary,
-  green: T.success,
-  red: T.danger,
-};
 
 const Detail = ({ label, value }: { label: string; value: string }) => (
     <View style={styles.detail}>
@@ -46,7 +35,6 @@ export default function TransactionDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const { data, loading, refresh } = useAppData();
-
   const [deleting, setDeleting] = useState(false);
 
   const tx = useMemo(
@@ -60,10 +48,7 @@ export default function TransactionDetails() {
     setDeleting(true);
     try {
       await deleteTransaction(tx.id);
-
-      // Reload the dashboard / lists so the deleted item disappears everywhere
       await refresh();
-
       router.back();
     } catch (err: any) {
       Alert.alert("Error", err?.message || "Could not delete transaction");
@@ -80,13 +65,17 @@ export default function TransactionDetails() {
   };
 
   const onEdit = () => {
-    // TODO: open an edit screen (e.g. /add-expense with the transaction id)
+    if (!tx || deleting) return;
+    router.push({
+      pathname: tx.type === "income" ? "/add-income" : "/add-expense",
+      params: { id: tx.id },
+    });
   };
 
   return (
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+        <ThemedStatusBar />
 
         <View style={styles.topBar}>
           <TouchableOpacity
@@ -109,10 +98,7 @@ export default function TransactionDetails() {
             </Text>
         ) : (
             <>
-              <ScrollView
-                  contentContainerStyle={styles.scroll}
-                  showsVerticalScrollIndicator={false}
-              >
+              <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
                 <View style={styles.hero}>
                   <View
                       style={[
@@ -141,9 +127,7 @@ export default function TransactionDetails() {
                 <Detail label="Description" value={tx.description || "-"} />
               </ScrollView>
 
-              <View
-                  style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 16) }]}
-              >
+              <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={[styles.btn, styles.editBtn, deleting && styles.btnDisabled]}
                     activeOpacity={0.8}
@@ -172,7 +156,7 @@ export default function TransactionDetails() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   topBar: { height: 52, alignItems: "center", justifyContent: "center" },
@@ -210,6 +194,6 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.5 },
   editBtn: { backgroundColor: C.card, borderColor: C.border },
   editText: { color: C.text, fontSize: 16, fontWeight: "600" },
-  deleteBtn: { backgroundColor: "#1c0a0c", borderColor: C.red },
+  deleteBtn: { backgroundColor: C.dangerBg, borderColor: C.red },
   deleteText: { color: C.red, fontSize: 16, fontWeight: "600" },
-});
+}));

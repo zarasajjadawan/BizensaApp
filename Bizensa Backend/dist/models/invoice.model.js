@@ -51,6 +51,7 @@ const invoiceSchema = new mongoose_1.Schema({
     total: { type: Number, required: true },
     dueDate: { type: Date, required: true },
     status: { type: String, enum: ["unpaid", "paid", "overdue"], default: "unpaid" },
+    paidAt: { type: Date, default: null },
 }, { timestamps: true });
 invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true });
 exports.default = mongoose_1.default.model("Invoice", invoiceSchema);
